@@ -3,6 +3,8 @@ import sys
 import openvr
 import math
 import json
+from transform import Transform
+import numpy as np
 
 # Function to print out text but instead of starting a new line it will overwrite the existing line
 def update_text(txt):
@@ -38,6 +40,7 @@ class pose_sample_buffer():
         self.i = 0
         self.index = []
         self.time = []
+        self.pose_mat = []
         self.x = []
         self.y = []
         self.z = []
@@ -51,6 +54,7 @@ class pose_sample_buffer():
 
     def append(self,pose_mat,t):
         self.time.append(t)
+        self.pose_mat.append(pose_mat)
         self.x.append(pose_mat[0][3])
         self.y.append(pose_mat[1][3])
         self.z.append(pose_mat[2][3])
@@ -62,6 +66,18 @@ class pose_sample_buffer():
         self.r_x.append((pose_mat[2][1]-pose_mat[1][2])/(4*r_w))
         self.r_y.append((pose_mat[0][2]-pose_mat[2][0])/(4*r_w))
         self.r_z.append((pose_mat[1][0]-pose_mat[0][1])/(4*r_w))
+
+class pose_sample_matrix_buffer():
+    def __init__(self):
+        self.i = 0
+        self.index = []
+        self.time = []
+        self.pose_mat = np.array((3,4))
+
+    def append(self,pose_mat,t):
+        self.time.append(t)
+        self.pose_mat += np.asarray(pose_mat)
+
 
 class vr_tracked_device():
     def __init__(self,vr_obj,index,device_class):
@@ -96,6 +112,52 @@ class vr_tracked_device():
         pose = self.vr.getDeviceToAbsoluteTrackingPose(openvr.TrackingUniverseStanding, 0,openvr.k_unMaxTrackedDeviceCount)
         return convert_to_quaternion(pose[self.index].mDeviceToAbsoluteTracking)
 
+class vr_tracked_device_rel():
+    def __init__(self,vr_obj,ref_index,dev_index):
+        self.ref_index = ref_index
+        self.dev_index = dev_index
+        self.vr = vr_obj
+
+    def sample(self,num_samples,sample_rate):
+        interval = 1/sample_rate
+        rtn = pose_sample_buffer()
+        sample_start = time.time()
+        for i in range(num_samples):
+            start = time.time()
+            pose = self.vr.getDeviceToAbsoluteTrackingPose(openvr.TrackingUniverseStanding, 0,openvr.k_unMaxTrackedDeviceCount)
+            ref = np.asarray(pose[self.ref_index].mDeviceToAbsoluteTracking.m)
+            dev = np.ndarray((4, 4))
+            dev[0:3, 0:4] = np.asarray(pose[self.dev_index].mDeviceToAbsoluteTracking.m)
+            dev[3:4:1, :] = [0, 0, 0, 1]
+            mat = np.matmul(Transform.inverse(ref), dev)
+            rtn.append(mat, time.time()-sample_start)
+            sleep_time = interval- (time.time()-start)
+            if sleep_time>0:
+                time.sleep(sleep_time)
+        return rtn
+
+    def sample_matrix(self,num_samples,sample_rate):
+        interval = 1/sample_rate
+        rtn = np.array((3,4))
+        sample_start = time.time()
+        for i in range(num_samples):
+            start = time.time()
+            pose = self.vr.getDeviceToAbsoluteTrackingPose(openvr.TrackingUniverseStanding, 0,openvr.k_unMaxTrackedDeviceCount)
+            rtn += np.asarray(pose[self.index].mDeviceToAbsoluteTracking)
+            sleep_time = interval- (time.time()-start)
+            if sleep_time>0:
+                time.sleep(sleep_time)
+        rtn /= num_samples
+        return rtn
+
+    def get_pose_euler(self):
+        pose = self.vr.getDeviceToAbsoluteTrackingPose(openvr.TrackingUniverseStanding, 0,openvr.k_unMaxTrackedDeviceCount)
+        return convert_to_euler(pose[self.index].mDeviceToAbsoluteTracking)
+
+    def get_pose_quaternion(self):
+        pose = self.vr.getDeviceToAbsoluteTrackingPose(openvr.TrackingUniverseStanding, 0,openvr.k_unMaxTrackedDeviceCount)
+        return convert_to_quaternion(pose[self.index].mDeviceToAbsoluteTracking)
+
 class vr_tracking_reference(vr_tracked_device):
     def get_mode(self):
         return self.vr.getStringTrackedDeviceProperty(self.index,openvr.Prop_ModeLabel_String).decode('utf-8').upper()
@@ -110,6 +172,7 @@ class triad_openvr():
         # Initializing object to hold indexes for various tracked objects
         self.object_names = {"Tracking Reference":[],"HMD":[],"Controller":[],"Tracker":[]}
         self.devices = {}
+        self.rel_devices = {}
         poses = self.vr.getDeviceToAbsoluteTrackingPose(openvr.TrackingUniverseStanding, 0,
                                                                openvr.k_unMaxTrackedDeviceCount)
 
@@ -119,7 +182,7 @@ class triad_openvr():
             with open('config.json') as json_data:
                 self.config = json.load(json_data)
         except EnvironmentError: # parent of IOError, OSError *and* WindowsError where available
-            print('config.json not found, arbitrary id will be chosen.')
+            print('config.json not found, arbitrary IDs will be chosen.')
 
         if self.config != None:
             # Iterate through the pose list to find the active devices and determine their type
@@ -174,3 +237,7 @@ class triad_openvr():
                 else:
                     print("  "+device+" ("+self.devices[device].get_serial()+
                           ", "+self.devices[device].get_model()+")")
+    def add_rel_dev(self, ref, dev):
+        self.rel_devices['{}-{}'.format(ref, dev)] = vr_tracked_device_rel(self.vr,
+                                                   self.devices[ref].index,
+                                                   self.devices[dev].index)
