@@ -124,39 +124,27 @@ class vr_tracked_device_rel():
         sample_start = time.time()
         for i in range(num_samples):
             start = time.time()
-            pose = self.vr.getDeviceToAbsoluteTrackingPose(openvr.TrackingUniverseStanding, 0,openvr.k_unMaxTrackedDeviceCount)
-            ref = np.asarray(pose[self.ref_index].mDeviceToAbsoluteTracking.m)
-            dev = np.ndarray((4, 4))
-            dev[0:3, 0:4] = np.asarray(pose[self.dev_index].mDeviceToAbsoluteTracking.m)
-            dev[3:4:1, :] = [0, 0, 0, 1]
-            mat = np.matmul(Transform.inverse(ref), dev)
+            mat = self.get_pose()
             rtn.append(mat, time.time()-sample_start)
             sleep_time = interval- (time.time()-start)
             if sleep_time>0:
                 time.sleep(sleep_time)
         return rtn
-
-    def sample_matrix(self,num_samples,sample_rate):
-        interval = 1/sample_rate
-        rtn = np.array((3,4))
-        sample_start = time.time()
-        for i in range(num_samples):
-            start = time.time()
-            pose = self.vr.getDeviceToAbsoluteTrackingPose(openvr.TrackingUniverseStanding, 0,openvr.k_unMaxTrackedDeviceCount)
-            rtn += np.asarray(pose[self.index].mDeviceToAbsoluteTracking)
-            sleep_time = interval- (time.time()-start)
-            if sleep_time>0:
-                time.sleep(sleep_time)
-        rtn /= num_samples
-        return rtn
+    def get_pose(self):
+        pose = self.vr.getDeviceToAbsoluteTrackingPose(openvr.TrackingUniverseStanding, 0,openvr.k_unMaxTrackedDeviceCount)
+        ref = np.asarray(pose[self.ref_index].mDeviceToAbsoluteTracking.m)
+        dev = np.ndarray((4, 4))
+        dev[0:3, 0:4] = np.asarray(pose[self.dev_index].mDeviceToAbsoluteTracking.m)
+        dev[3:4:1, :] = [0, 0, 0, 1]
+        return np.matmul(Transform.inverse(ref), dev)
 
     def get_pose_euler(self):
-        pose = self.vr.getDeviceToAbsoluteTrackingPose(openvr.TrackingUniverseStanding, 0,openvr.k_unMaxTrackedDeviceCount)
-        return convert_to_euler(pose[self.index].mDeviceToAbsoluteTracking)
+        # pose = self.vr.getDeviceToAbsoluteTrackingPose(openvr.TrackingUniverseStanding, 0,openvr.k_unMaxTrackedDeviceCount)
+        return convert_to_euler(self.get_pose())
 
     def get_pose_quaternion(self):
-        pose = self.vr.getDeviceToAbsoluteTrackingPose(openvr.TrackingUniverseStanding, 0,openvr.k_unMaxTrackedDeviceCount)
-        return convert_to_quaternion(pose[self.index].mDeviceToAbsoluteTracking)
+        # pose = self.vr.getDeviceToAbsoluteTrackingPose(openvr.TrackingUniverseStanding, 0,openvr.k_unMaxTrackedDeviceCount)
+        return convert_to_quaternion(self.get_pose())
 
 class vr_tracking_reference(vr_tracked_device):
     def get_mode(self):
