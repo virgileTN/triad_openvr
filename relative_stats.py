@@ -99,6 +99,16 @@ plt.xlabel('Time (seconds)')
 if args.file:
     df = pd.DataFrame(data=save)
     df.to_csv(args.file)
-pp.pprint(save)
+    pp.pprint(save)
+else:
+    while(1):
+        data = v.rel_devices['tracking_reference_1-tracker_0'].sample(args.samples,
+        args.frequency)
+        stats['roll'] = create_dict(data.roll, data.time)
+        stats['pitch'] = create_dict(data.pitch, data.time)
+        stats['yaw'] = create_dict(data.yaw, data.time)
+        print('roll', stats['roll']['stats']['mean'])
+        print('pitch', stats['pitch']['stats']['mean'])
+        print('yaw', stats['yaw']['stats']['mean'])
 # pp.pprint(stats)
 plt.show()
