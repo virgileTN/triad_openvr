@@ -23,7 +23,7 @@ pp = pprint.PrettyPrinter(indent=4)
 
 v = vr.triad_openvr()
 v.print_discovered_objects()
-v.add_rel_dev('tracking_reference_1', 'tracker_0')
+v.add_rel_dev(args.reference, args.device)
 
 for key, value in enumerate(v.rel_devices):
     print (key, value)
@@ -38,8 +38,21 @@ def create_dict(data_raw, time):
             'raw': {'data': data_raw, 'time': time}}
 
 
-data = v.rel_devices['tracking_reference_1-tracker_0'].sample(args.samples,
+data = v.rel_devices['{0}-{1}'.format(args.reference, args.device)].sample(args.samples,
                                                               args.frequency)
+raw = {}
+raw['time'] = data.time
+raw['x'] = data.x
+raw['y'] = data.y
+raw['z'] = data.z
+raw['r_x'] = data.r_x
+raw['r_y'] = data.r_y
+raw['r_z'] = data.r_z
+raw['r_w'] = data.r_w
+raw['roll'] = data.roll
+raw['pitch'] = data.pitch
+raw['yaw'] = data.yaw
+
 stats = {}
 # data = v.devices[args.device].sample_matrix(args.samples, args.frequency)
 # print(data)
@@ -97,9 +110,12 @@ for key, value in stats.items():
 plt.xlabel('Time (seconds)')
 
 if args.file:
-    df = pd.DataFrame(data=save)
-    df.to_csv(args.file)
-    pp.pprint(save)
+    # df = pd.DataFrame(data=save)
+    # df.to_csv(args.file)
+    raw_df = pd.DataFrame(data=raw)
+    raw_df.to_csv('{}_raw'.format(args.file), index=False)
+    # pp.pprint(save)
+    # pp.pprint(raw)
 else:
     while(1):
         data = v.rel_devices['tracking_reference_1-tracker_0'].sample(args.samples,
@@ -107,8 +123,14 @@ else:
         stats['roll'] = create_dict(data.roll, data.time)
         stats['pitch'] = create_dict(data.pitch, data.time)
         stats['yaw'] = create_dict(data.yaw, data.time)
+        stats['x'] = create_dict(data.x, data.time)
+        stats['y'] = create_dict(data.y, data.time)
+        stats['z'] = create_dict(data.z, data.time)
         print('roll', stats['roll']['stats']['mean'])
         print('pitch', stats['pitch']['stats']['mean'])
         print('yaw', stats['yaw']['stats']['mean'])
+        print('x', stats['x']['stats']['mean'])
+        print('y', stats['y']['stats']['mean'])
+        print('z', stats['z']['stats']['mean'])
 # pp.pprint(stats)
-plt.show()
+# plt.show()
