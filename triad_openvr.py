@@ -6,11 +6,6 @@ import json
 from transform import Transform
 import numpy as np
 
-# Function to print out text but instead of starting a new line it will overwrite the existing line
-def update_text(txt):
-    sys.stdout.write('\r'+txt)
-    sys.stdout.flush()
-
 #Convert the standard 3x4 position/rotation matrix to a x,y,z location and the appropriate Euler angles (in degrees)
 def convert_to_euler(pose_mat):
     yaw = 180 / math.pi * math.atan(pose_mat[1][0] /pose_mat[0][0])
@@ -33,51 +28,6 @@ def convert_to_quaternion(pose_mat):
     y = pose_mat[1][3]
     z = pose_mat[2][3]
     return [x,y,z,r_w,r_x,r_y,r_z]
-
-#Define a class to make it easy to append pose matricies and convert to both Euler and Quaternion for plotting
-class pose_sample_buffer():
-    def __init__(self):
-        self.i = 0
-        self.index = []
-        self.time = []
-        self.pose_mat = []
-        self.x = []
-        self.y = []
-        self.z = []
-        self.yaw = []
-        self.pitch = []
-        self.roll = []
-        self.r_w = []
-        self.r_x = []
-        self.r_y = []
-        self.r_z = []
-
-    def append(self,pose_mat,t):
-        self.time.append(t)
-        self.pose_mat.append(pose_mat)
-        self.x.append(pose_mat[0][3])
-        self.y.append(pose_mat[1][3])
-        self.z.append(pose_mat[2][3])
-        self.yaw.append(180 / math.pi * math.atan(pose_mat[1][0] /pose_mat[0][0]))
-        self.pitch.append(180 / math.pi * math.atan(-1 * pose_mat[2][0] / math.sqrt(pow(pose_mat[2][1], 2) + math.pow(pose_mat[2][2], 2))))
-        self.roll.append(180 / math.pi * math.atan(pose_mat[2][1] /pose_mat[2][2]))
-        r_w = math.sqrt(abs(1+pose_mat[0][0]+pose_mat[1][1]+pose_mat[2][2]))/2
-        self.r_w.append(r_w)
-        self.r_x.append((pose_mat[2][1]-pose_mat[1][2])/(4*r_w))
-        self.r_y.append((pose_mat[0][2]-pose_mat[2][0])/(4*r_w))
-        self.r_z.append((pose_mat[1][0]-pose_mat[0][1])/(4*r_w))
-
-class pose_sample_matrix_buffer():
-    def __init__(self):
-        self.i = 0
-        self.index = []
-        self.time = []
-        self.pose_mat = np.array((3,4))
-
-    def append(self,pose_mat,t):
-        self.time.append(t)
-        self.pose_mat += np.asarray(pose_mat)
-
 
 class vr_tracked_device():
     def __init__(self,vr_obj,index,device_class):
@@ -112,24 +62,43 @@ class vr_tracked_device():
         pose = self.vr.getDeviceToAbsoluteTrackingPose(openvr.TrackingUniverseStanding, 0,openvr.k_unMaxTrackedDeviceCount)
         return convert_to_quaternion(pose[self.index].mDeviceToAbsoluteTracking)
 
-class vr_tracked_device_rel():
-    def __init__(self,vr_obj,ref_index,dev_index):
+class vr_relative_tracked_device():
+    def __init__(self, vr_obj, ref_index, dev_index):
         self.ref_index = ref_index
         self.dev_index = dev_index
         self.vr = vr_obj
 
-    def sample(self,num_samples,sample_rate):
+    def sample(self, num_samples, sample_rate):
         interval = 1/sample_rate
-        rtn = pose_sample_buffer()
+        # rtn = pose_sample_buffer()
+        rtn = {'time': [], 'x': [], 'y': [], 'z': [],
+               'r_x': [], 'r_y': [], 'r_z': [], 'r_w': [],
+               'roll': [], 'pitch': [], 'yaw': []}
+
         sample_start = time.time()
         for i in range(num_samples):
             start = time.time()
             mat = self.get_pose()
-            rtn.append(mat, time.time()-sample_start)
-            sleep_time = interval- (time.time()-start)
+            # rtn.append(mat, time.time()-sample_start)
+            # Append to dict
+            rtn['time'].append(time.time()-sample_start)
+            # rtn['mat'].append(mat)
+            rtn['x'].append(mat[0][3])
+            rtn['y'].append(mat[1][3])
+            rtn['z'].append(mat[2][3])
+            rtn['yaw'].append(180 / math.pi * math.atan(mat[1][0] /mat[0][0]))
+            rtn['pitch'].append(180 / math.pi * math.atan(-1 * mat[2][0] / math.sqrt(pow(mat[2][1], 2) + math.pow(mat[2][2], 2))))
+            rtn['roll'].append(180 / math.pi * math.atan(mat[2][1] /mat[2][2]))
+            r_w = math.sqrt(abs(1+mat[0][0]+mat[1][1]+mat[2][2]))/2
+            rtn['r_w'].append(r_w)
+            rtn['r_x'].append((mat[2][1]-mat[1][2])/(4*r_w))
+            rtn['r_y'].append((mat[0][2]-mat[2][0])/(4*r_w))
+            rtn['r_z'].append((mat[1][0]-mat[0][1])/(4*r_w))
+            sleep_time = interval - (time.time()-start)
             if sleep_time>0:
                 time.sleep(sleep_time)
         return rtn
+
     def get_pose(self):
         pose = self.vr.getDeviceToAbsoluteTrackingPose(openvr.TrackingUniverseStanding, 0,openvr.k_unMaxTrackedDeviceCount)
         ref = np.asarray(pose[self.ref_index].mDeviceToAbsoluteTracking.m)
@@ -226,6 +195,6 @@ class triad_openvr():
                     print("  "+device+" ("+self.devices[device].get_serial()+
                           ", "+self.devices[device].get_model()+")")
     def add_rel_dev(self, ref, dev):
-        self.rel_devices['{}-{}'.format(ref, dev)] = vr_tracked_device_rel(self.vr,
+        self.rel_devices['{}-{}'.format(ref, dev)] = vr_relative_tracked_device(self.vr,
                                                    self.devices[ref].index,
                                                    self.devices[dev].index)

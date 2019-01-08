@@ -9,13 +9,15 @@ import numpy as np
 import seaborn as sns
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-d', '--directory', help='directory to read', type=str,
-                    default='data/')
+parser.add_argument('directory', help='directory to read', type=str)
+parser.add_argument('-v', '--var', help='variable to plot', type=str,
+                    default='x')
+parser.add_argument('-r', '--ref', help='reference variable', type=str,
+                    default='roll')
+parser.add_argument('-t', '--type', help='type of plot', type=str,
+                    default='box', choices=['box', 'boxen', 'violin'])
 args = parser.parse_args()
 pp = pprint.PrettyPrinter(indent=4)
-
-# data = {'ref_roll': [], 'x': [], 'y': [], 'z': [], 'roll': [], 'pitch': [],
-#         'yaw': []}
 datas = []
 path = Path(os.getcwd()+'/'+args.directory)
 os.chdir(path)
@@ -28,24 +30,19 @@ d = {'x': [], 'y': [], 'z': [], 'roll': [], 'pitch': [], 'yaw': [], 'r_x': [],
 full_df = pd.DataFrame(data=d)
 for f in files:
     df = pd.read_csv(f)
-    roll = df.get('roll')
-    df = df.assign(ref_roll=pd.Series([np.mean(roll)]*len(roll)).values)
+    ref = df.get(args.ref)
+    df = df.assign(ref=pd.Series([np.round(np.mean(ref))]*len(ref)).values)
     pp.pprint(df)
     full_df = full_df.append(df)
 
 pp.pprint(full_df)
-sns.boxplot(x='ref_roll', y='x', data=full_df)
-# sns.boxplot(y='roll', data=df)
-plt.show()
+if args.type == 'boxen':
+    ax = sns.boxenplot(x='ref', y=args.var, data=full_df)
+elif args.type == 'violin':
+    ax = sns.violinplot(x='ref', y='z', data=full_df)
+else:
+    ax = sns.boxplot(x='ref', y='z', data=full_df)
 
-# df = pd.DataFrame(data)
-# df.sort_values(by='ref_roll', inplace=True)
-# # Fixing random state for reproducibility
-# np.random.seed(19680801)
-#
-# # fake up some data
-# spread = np.random.rand(50) * 100
-# center = np.ones(25) * 50
-# flier_high = np.random.rand(10) * 100 + 100
-# flier_low = np.random.rand(10) * -100
-# data = np.concatenate((spread, center, flier_high, flier_low))
+ax.set_ylabel(args.var)
+ax.set_xlabel(args.ref)
+plt.show()
