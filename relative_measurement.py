@@ -1,8 +1,5 @@
 import triad_openvr as vr
-import statistics
-import matplotlib.pyplot as plt
 import argparse
-from transform import Transform
 import pprint
 import pandas as pd
 import numpy as np
