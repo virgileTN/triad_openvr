@@ -1,16 +1,16 @@
 import time
-import sys
 import openvr
 import math
 import json
 from transform import Transform
 import numpy as np
 
-#Convert the standard 3x4 position/rotation matrix to a x,y,z location and the appropriate Euler angles (in degrees)
+# Convert the standard 3x4 position/rotation matrix to a x,y,z location
+# and the appropriate Euler angles (in degrees)
 def convert_to_euler(pose_mat):
-    yaw = 180 / math.pi * math.atan(pose_mat[1][0] /pose_mat[0][0])
+    yaw = 180 / math.pi * math.atan(pose_mat[1][0] / pose_mat[0][0])
     pitch = 180 / math.pi * math.atan(-1 * pose_mat[2][0] / math.sqrt(pow(pose_mat[2][1], 2) + math.pow(pose_mat[2][2], 2)))
-    roll = 180 / math.pi * math.atan(pose_mat[2][1] /pose_mat[2][2])
+    roll = 180 / math.pi * math.atan(pose_mat[2][1] / pose_mat[2][2])
     x = pose_mat[0][3]
     y = pose_mat[1][3]
     z = pose_mat[2][3]
@@ -73,7 +73,8 @@ class vr_relative_tracked_device():
         # rtn = pose_sample_buffer()
         rtn = {'time': [], 'x': [], 'y': [], 'z': [],
                'r_x': [], 'r_y': [], 'r_z': [], 'r_w': [],
-               'roll': [], 'pitch': [], 'yaw': []}
+               'roll': [], 'pitch': [], 'yaw': [],
+               'matrix': []}
 
         sample_start = time.time()
         for i in range(num_samples):
@@ -82,7 +83,7 @@ class vr_relative_tracked_device():
             # rtn.append(mat, time.time()-sample_start)
             # Append to dict
             rtn['time'].append(time.time()-sample_start)
-            # rtn['mat'].append(mat)
+            rtn['matrix'].append(mat)
             rtn['x'].append(mat[0][3])
             rtn['y'].append(mat[1][3])
             rtn['z'].append(mat[2][3])
