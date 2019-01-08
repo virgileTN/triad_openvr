@@ -37,7 +37,8 @@ if args.file:
     pose_dataframe = pose_dataframe.assign(lighthouses_count=pd.Series([lighthouses_count]*len(pose_dataframe)).values)
     pose_dataframe.to_csv('{}_raw'.format(args.file), index=False)
     pretty_printer.pprint(pose_dataframe)
-    print("data succefully writed to {}".format(args.file))
+    print("translation {} succefully written to {}".format('{0}-{1}'.format(args.reference, args.device),
+                                                                           args.file))
 else:
     while(1):
         data = v.rel_devices['{0}-{1}'.format(args.reference,
